@@ -49,12 +49,13 @@ router.post("/", async (req, res, next) => {
     const { error } = itemsSchema.validate(req.body);
     if (error) {
       res.status(400).json({ error: error.details[0].message });
-    }
-    if (!name || !email || !phone) {
-      res.status(400).json({ message: "missing required name field" });
     } else {
-      const newContact = await addContact({ name, email, phone });
-      res.status(201).json(newContact);
+      if (!name || !email || !phone) {
+        res.status(400).json({ message: "missing required name field" });
+      } else {
+        const newContact = await addContact({ name, email, phone });
+        res.status(201).json(newContact);
+      }
     }
   } catch (err) {
     res.status(500).json({ error: "Internal Server Error" });
@@ -87,17 +88,18 @@ router.put("/:contactId", async (req, res, next) => {
     const { error } = itemsSchema.validate(req.body);
     if (error) {
       res.status(400).json({ error: error.details[0].message });
-    }
-    if (!req.body || Object.keys(req.body).length === 0) {
-      return res.status(400).json({ message: "Missing fields" });
-    }
-    const updatedContact = await updateContact(contactId, req.body);
+    } else {
+      if (!req.body || Object.keys(req.body).length === 0) {
+        return res.status(400).json({ message: "Missing fields" });
+      }
+      const updatedContact = await updateContact(contactId, req.body);
 
-    if (!updatedContact) {
-      return res.status(404).json({ message: "Contact not found" });
-    }
+      if (!updatedContact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
 
-    res.status(200).json(updatedContact);
+      res.status(200).json(updatedContact);
+    }
   } catch (err) {
     res.status(500).json({ error: "Internal Server Error3" });
   }
