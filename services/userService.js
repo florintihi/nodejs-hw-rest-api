@@ -12,8 +12,13 @@ const updateToken = (id, fields) => {
   return user.findByIdAndUpdate({ _id: id }, fields, { new: true });
 };
 
+// const updateAvatar = (id, fields) => {
+//   return user.findByIdAndUpdate({ _id: id }, fields, { new: true });
+// };
+
 module.exports = {
   createUser,
   getUser,
   updateToken,
+  // updateAvatar,
 };

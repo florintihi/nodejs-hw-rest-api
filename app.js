@@ -1,9 +1,9 @@
-require("dotenv").config({ path: "./info.env" });
 const express = require("express");
 const logger = require("morgan");
 const cors = require("cors");
 const passport = require("passport");
 require("./config/passport")(passport);
+require("dotenv").config({ path: "./info.env" });
 
 const contactsRouter = require("./routes/api/contacts");
 const authRouter = require("./routes/api/auth");
@@ -17,6 +17,9 @@ app.use(logger(formatsLogger));
 app.use(cors());
 // app.use(passport.initialize());
 app.use(express.json());
+
+app.use(express.static("public"));
+app.use("/avatars", express.static("avatars"));
 
 app.use("/users", authRouter);
 app.use("/contacts", contactsRouter);
@@ -41,10 +44,7 @@ app.use((err, req, res, next) => {
 const connectionString = `mongodb+srv://florintihi:${process.env.PASSWORD}@hw03-mongodb.nekl7d9.mongodb.net/db-contacts`;
 
 mongoose
-  .connect(connectionString, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(connectionString)
   .then(() => console.log("Database connection successful"))
   .catch((err) => {
     console.log(err);
