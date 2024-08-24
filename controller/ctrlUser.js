@@ -7,6 +7,19 @@ const multer = require("multer");
 const Jimp = require("jimp");
 const path = require("path");
 const fs = require("fs").promises;
+const sgMail = require("@sendgrid/mail");
+const { v4: uuidv4 } = require("uuid");
+const Joi = require("joi");
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+const contactSchema = Joi.object({
+  email: Joi.string()
+    .required()
+    .email({
+      minDomainSegments: 2,
+      tlds: { allow: ["com", "net"] },
+    }),
+});
 
 const addUser = async (req, res, next) => {
   const { email, password, subscription, token } = req.body;
@@ -20,6 +33,7 @@ const addUser = async (req, res, next) => {
     });
   }
   try {
+    const verificationToken = uuidv4();
     const avatarURL = gravatar.url(email, { s: "200", r: "pg", d: "retro" });
     const newUser = await service.createUser({
       email,
@@ -27,10 +41,20 @@ const addUser = async (req, res, next) => {
       subscription,
       token,
       avatarURL,
+      verificationToken,
     });
-    // const newUser = new User({ email, subscription, token });
+
     await newUser.setPassword(password);
     await newUser.save();
+
+    const message = {
+      to: email,
+      from: "yveshw06@outlook.com",
+      subject: "Verify your email",
+      html: `<a target="_blank" href="http://localhost:3000/users/verify/${verificationToken}">Click to verify your email!</a>`,
+    };
+
+    await sgMail.send(message);
     res.status(201).json({
       status: "success",
       code: 201,
@@ -59,6 +83,14 @@ const signIn = async (req, res, next) => {
     });
   }
 
+  if (!user.verify) {
+    return res.json({
+      status: "error",
+      code: 401,
+      message: "Email not verified!",
+    });
+  }
+
   try {
     const payload = {
       id: user._id,
@@ -66,7 +98,7 @@ const signIn = async (req, res, next) => {
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "1w",
+      expiresIn: "1h",
     });
     res.json({
       status: "success",
@@ -159,6 +191,67 @@ const updateAvatar = async (req, res, next) => {
   }
 };
 
+const verifyEmail = async (req, res, next) => {
+  try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+    if (!user) {
+      res.json({
+        status: "Error",
+        code: 404,
+        message: "User not found!",
+      });
+    }
+
+    await User.findByIdAndUpdate(user._id, {
+      verify: true,
+      verificationToken: "",
+    });
+    res.json({
+      status: "Success",
+      code: 200,
+      message: "Verification successful!",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const verify = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await service.getUser(email);
+    const { error } = contactSchema.validate(req.body);
+    if (error) {
+      res.status(400).json({ message: "missing required field email" });
+      return;
+    }
+    const message = {
+      to: email,
+      from: "yveshw06@outlook.com",
+      subject: "Verify your email",
+      html: `<a target="_blank" href="http://localhost:3000/users/verify/${user.verificationToken}">Click to verify your email!</a>`,
+    };
+
+    if (!user.verify) {
+      await sgMail.send(message);
+      return res.json({
+        status: "success",
+        code: 200,
+        message: "Verification email sent",
+      });
+    }
+
+    return res.json({
+      status: "error",
+      code: 400,
+      message: "Verification has already been passed",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   addUser,
   signIn,
@@ -166,4 +259,6 @@ module.exports = {
   currentUser,
   updateAvatar,
   upload,
+  verifyEmail,
+  verify,
 };
